@@ -461,7 +461,7 @@
         const payload = {
             contents: [{
                 parts: [
-                    { text: "이 사진 속 음식의 이름, 추정 칼로리, 주요 영양소(탄수화물, 단백질, 지방)를 분석해서 JSON 형식으로 응답해줘. 응답 형식: { \"foodName\": \"\", \"calories\": \"\", \"nutrients\": { \"carbs\": \"\", \"protein\": \"\", \"fat\": \"\" }, \"description\": \"\" }" },
+                    { text: "이 사진 속 음식의 이름, 추정 칼로리(숫자 위주), 주요 영양소(탄수화물, 단백질, 지방)를 분석해서 JSON 형식으로 응답해줘. 응답 형식: { \"foodName\": \"\", \"calories\": \"\", \"nutrients\": { \"carbs\": \"\", \"protein\": \"\", \"fat\": \"\" }, \"description\": \"\" }" },
                     { inlineData: { mimeType: "image/jpeg", data: base64 } }
                 ]
             }],
@@ -488,11 +488,15 @@
     }
 
     function renderResult(data) {
+        // AI가 "약" 글자를 포함해서 보내더라도 중복되지 않도록 처리
+        let displayKcal = (data.calories || '0').toString();
+        displayKcal = displayKcal.replace(/약/g, '').trim();
+
         resultArea.innerHTML = `
             <div class="result-card">
                 <div class="food-header">
                     <div class="food-title">🥗 ${data.foodName || '식별된 음식'}</div>
-                    <div class="food-kcal">🔥 약 ${data.calories || '0'} kcal</div>
+                    <div class="food-kcal">🔥 약 ${displayKcal} kcal</div>
                 </div>
 
                 <div class="nutrient-container">

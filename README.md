@@ -15,7 +15,7 @@ Gemini Canvas 미션 결과물을 관리하는 저장소입니다.
 
 ### 배포 링크
 
-[https://gemini.google.com/share/56c624d38792](https://gemini.google.com/share/56c624d38792/)
+[https://gemini.google.com/share/95409f572741](https://gemini.google.com/share/95409f572741/)
 
 ### 이 앱을 만든 이유
 
@@ -61,3 +61,6 @@ Gemini Canvas 미션 결과물을 관리하는 저장소입니다.
 - 최종 점수 표시 기능
 - 현재 최고 점수 표시 기능
 - 무지개 색의 소행성과 충돌할 경우 3초 간의 충돌 무시 기능
+
+---
+
