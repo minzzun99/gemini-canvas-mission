@@ -84,11 +84,13 @@
 <body>
 
 <div id="ui-layer">
+    <!-- 무적 알림 -->
     <div id="invincible-container">
         <div id="invincible-ui" class="rainbow-text">RAINBOW POWER!</div>
         <div id="invincible-timer">3.0s</div>
     </div>
 
+    <!-- 상단 점수판 -->
     <div class="p-4 flex justify-between items-start text-white">
         <div class="bg-black/50 backdrop-blur p-3 rounded-xl shadow-lg border-2 border-indigo-500">
             <div class="text-xs text-indigo-300 font-bold uppercase tracking-wider">High Score</div>
@@ -100,14 +102,32 @@
         </div>
     </div>
 
+    <!-- 시작/종료 오버레이 -->
     <div id="overlay" class="absolute inset-0 flex items-center justify-center bg-black/70 backdrop-blur-sm hidden interactive">
-        <div class="bg-gray-900 p-8 rounded-3xl shadow-2xl text-center max-w-xs w-full border-4 border-indigo-500">
+
+        <!-- 왼쪽 상단 가이드 -->
+        <div id="game-guide" class="absolute top-4 left-4 bg-black/40 border border-white/20 p-4 rounded-2xl text-white text-sm max-w-[220px] backdrop-blur-md">
+            <div class="font-bold text-indigo-300 mb-2 flex items-center">
+                <span class="mr-2">🚀</span> 게임 가이드
+            </div>
+            <ul class="space-y-2 text-xs leading-relaxed opacity-90">
+                <li>• <span class="text-yellow-400 font-bold">방향키</span> 또는 하단 <span class="text-yellow-400 font-bold">버튼</span>으로 이동</li>
+                <li>• 앞으로 전진할 때마다 <span class="text-green-400 font-bold">1점</span> 획득</li>
+                <li>• 소행성과 충돌하면 게임이 종료됩니다.</li>
+                <li>• <span class="text-sky-400 font-bold">Rainbow Power</span>: 무지개 소행성 충돌 시 <span class="text-cyan-400 font-bold">3초간</span> 지속되며 소행성과 충돌하지 않습니다.</li>
+            </ul>
+        </div>
+
+        <!-- 메인 카드 -->
+        <div class="bg-gray-900 p-8 rounded-3xl shadow-2xl text-center max-w-xs w-full border-4 border-indigo-500 relative">
             <h1 id="status-title" class="text-3xl font-black text-indigo-400 mb-2">은하계 건너기</h1>
-            <p id="status-desc" class="text-indigo-200 mb-6">행성이가 소행성을 피해 안전하게 건너도록 도와주세요!</p>
+            <p id="status-desc" class="text-indigo-200 mb-6 text-sm">행성이가 소행성을 피해 안전하게 건너도록 도와주세요!</p>
+
             <div id="final-score-container" class="mb-6 hidden">
                 <div class="text-sm text-indigo-300">최종 점수</div>
                 <div id="final-score" class="text-5xl font-black text-white">0</div>
             </div>
+
             <button id="start-btn" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-4 rounded-xl shadow-lg transition-all transform hover:scale-105 active:scale-95">
                 시작하기
             </button>
@@ -186,7 +206,7 @@
 
     const GRID_SIZE = 1;
     const LANE_WIDTH = 20;
-    const MIN_ASTEROID_SPACING = 5; // 소행성 간 최소 거리
+    const MIN_ASTEROID_SPACING = 5;
 
     let score = 0;
     let highScore = localStorage.getItem('haengseongi-highscore') || 0;
@@ -337,7 +357,6 @@
         const isRainbow = Math.random() < 0.1;
         const spawnX = laneInfo.speed > 0 ? -LANE_WIDTH/2 : LANE_WIDTH/2;
 
-        // 겹침 방지 체크: 동일 레인의 다른 소행성들과의 거리 확인
         const othersInLane = asteroids.filter(a => a.laneIndex === laneInfo.index);
         const tooClose = othersInLane.some(a => Math.abs(a.mesh.position.x - spawnX) < MIN_ASTEROID_SPACING);
         if (tooClose) return;
@@ -448,6 +467,8 @@
         document.getElementById('final-score').innerText = score;
         document.getElementById('final-score-container').classList.remove('hidden');
         document.getElementById('start-btn').innerText = "다시 도전하기";
+
+        document.getElementById('game-guide').style.display = 'block';
         setTimeout(() => document.getElementById('overlay').classList.remove('hidden'), 800);
     }
 
@@ -465,6 +486,8 @@
         updateScoreUI();
         asteroids.forEach(a => scene.remove(a.mesh)); asteroids.length = 0;
         explosionParticles.forEach(p => scene.remove(p.mesh)); explosionParticles.length = 0;
+
+        document.getElementById('game-guide').style.display = 'none';
         document.getElementById('overlay').classList.add('hidden');
         document.getElementById('final-score-container').classList.add('hidden');
     }
