@@ -78,7 +78,7 @@
                 <i data-lucide="terminal" class="text-blue-500"></i>
                 자바 Stream 시각화 학습 시뮬레이터
             </h1>
-            <p class="text-slate-400 text-sm mt-1">AI 기반 무한 문제 생성 및 단계별 스트림 학습 도구</p>
+            <p class="text-slate-400 text-sm mt-1">AI 기반 배치 문제 생성 및 단계별 스트림 시각화 도구</p>
         </div>
 
         <div class="flex items-center bg-slate-800 p-1 rounded-lg border border-slate-700">
@@ -134,12 +134,17 @@
             <div id="view-practice" class="hidden space-y-6">
                 <div class="bg-slate-900 rounded-xl border border-slate-800 p-6 min-h-[450px]">
                     <div class="flex items-center justify-between mb-6">
-                        <div>
+                        <div class="flex-1 mr-4">
                             <h2 id="quiz-title" class="text-xl font-bold text-white">문제를 불러오는 중...</h2>
-                            <p id="quiz-desc" class="text-slate-400 text-sm mt-1"></p>
+                            <p id="quiz-desc" class="text-slate-400 text-sm mt-2 leading-relaxed"></p>
                         </div>
-                        <div id="quiz-badge" class="bg-indigo-900/30 px-3 py-1 rounded text-[10px] font-bold text-indigo-400 border border-indigo-500/20">
-                            AI 실시간 생성됨
+                        <div class="flex flex-col items-end gap-2 shrink-0">
+                            <div id="queue-status" class="px-2 py-1 bg-slate-800 rounded text-[10px] text-indigo-400 font-bold border border-indigo-500/20">
+                                남은 문제: 0
+                            </div>
+                            <div id="quiz-badge" class="bg-indigo-900/30 px-3 py-1 rounded text-[10px] font-bold text-indigo-400 border border-indigo-500/20">
+                                AI BATCH GENERATED
+                            </div>
                         </div>
                     </div>
 
@@ -382,6 +387,10 @@
     let currentMode = 'LEARN';
     let isSolved = false;
 
+    let problemQueue = [];
+    const BATCH_SIZE = 5;
+    let isFetchingBatch = false;
+
     function init() {
         renderLearnMissionList();
         selectMission('m1');
@@ -404,15 +413,14 @@
         const comparisonSection = document.getElementById('code-comparison-section');
         if (mode === 'PRACTICE') {
             comparisonSection.classList.add('hidden');
+            if (!practiceMission && problemQueue.length === 0) {
+                generateNextProblem();
+            } else if (practiceMission) {
+                updatePracticeUI();
+            }
         } else {
             comparisonSection.classList.remove('hidden');
-        }
-
-        if (mode === 'LEARN') {
             selectMission(activeMission.id);
-        } else {
-            if (!practiceMission) generateNextProblem();
-            else updatePracticeUI();
         }
     }
 
@@ -443,55 +451,58 @@
         resetViz();
     }
 
-    async function generateNextProblem() {
+    async function fetchProblemsInBatch() {
+        if (isFetchingBatch) return;
+        isFetchingBatch = true;
+
         const btn = document.getElementById('next-prob-btn');
         const container = document.getElementById('quiz-editor-container');
-        const lambdaBadge = document.getElementById('lambda-hint-badge');
 
-        btn.innerHTML = '<i data-lucide="loader-2" class="w-4 h-4 animate-spin"></i> 생성 중...';
+        btn.innerHTML = `<i data-lucide="loader-2" class="w-4 h-4 animate-spin"></i> ${BATCH_SIZE}개 생성 중...`;
         btn.disabled = true;
-        container.innerHTML = '<div class="h-32 flex items-center justify-center text-slate-500 italic">AI가 새로운 실습 문제를 준비하고 있습니다...</div>';
-        lambdaBadge.classList.add('hidden');
+
+        // 처음 생성하는 경우에만 로딩 표시
+        if (problemQueue.length === 0 && !practiceMission) {
+            container.innerHTML = `<div class="h-32 flex flex-col items-center justify-center text-slate-500 italic gap-2">
+                    <i data-lucide="sparkles" class="w-6 h-6 animate-pulse text-indigo-400"></i>
+                    <span>AI가 ${BATCH_SIZE}개의 상세한 실습 문제를 한 번에 준비하고 있습니다...</span>
+                    <span class="text-[10px] opacity-60">(다양한 시나리오를 설계 중입니다)</span>
+                </div>`;
+        }
         safeCreateIcons();
 
-        const randomDatasetKey = Object.keys(DATASETS)[Math.floor(Math.random() * Object.keys(DATASETS).length)];
-        const dataset = DATASETS[randomDatasetKey];
-        const quizTypes = ['CHOICE', 'BLANK', 'WRITE'];
-        const randomType = quizTypes[Math.floor(Math.random() * quizTypes.length)];
+        const systemPrompt = `You are a Java Stream Expert Instructor. Generate exactly ${BATCH_SIZE} quiz problems. Output ONLY a JSON object with a "problems" key containing an array of ${BATCH_SIZE} problems.
 
-        const varNames = { ORDERS: 'o', STUDENTS: 's', EMPLOYEES: 'e', INVENTORY: 'i', MOVIES: 'm' };
-        const targetVar = varNames[randomDatasetKey] || 'x';
-
-        const systemPrompt = `You are a Java Stream Expert. Generate a quiz problem. Output ONLY JSON.
-            Types:
-            - CHOICE: Multiple choice.
-            - BLANK: Fill in the blank.
-            - WRITE: Entire pipeline after .stream().
-
-            MANDATORY RULES:
-            1. You MUST include a "forCode" field showing a traditional for-loop version of the logic. NEVER leave it empty.
-            2. For the solution lambda, you MUST use the parameter name '${targetVar}'.
-            3. Mention "람다식의 매개변수는 '${targetVar}'를 사용하세요" in the "question" field for BLANK and WRITE types.
-            4. VERY IMPORTANT: For 'WRITE' type, the 'answer' field string MUST start with a '.' (dot) (e.g., ".filter(...).collect(...)").
-            5. In the "question" field for 'WRITE' type, explicitly instruct the user to start their answer with a '.' (마침표로 시작하세요).
+            MANDATORY PROBLEM GUIDELINES:
+            1. DESCRIPTION (desc): Provide a detailed story-based context (in Korean). (e.g., "우리는 창고 관리자입니다. 현재 전자제품 카테고리의 재고가 부족하다는 보고를 받았습니다. 재고가 10개 미만인 상품들을 식별하여 발주 리스트를 작성해야 합니다.")
+            2. FOR-LOOP (forCode): Always provide a valid, functional Java for-loop snippet that achieves the exact same result. DO NOT omit this.
+            3. LAMBDA VARIABLE: Use specific variable names for each dataset ('o' for ORDERS, 's' for STUDENTS, 'e' for EMPLOYEES, 'i' for INVENTORY, 'm' for MOVIES).
+            4. DOT REQUIREMENT: For 'WRITE' type, the answer string MUST start with '.' (dot).
+            5. QUESTION: Include specific instructions about the variable name to use (e.g., "람다 매개변수는 'o'를 사용하세요").
 
             JSON structure:
             {
-                "title": "Problem Title (KR)",
-                "desc": "Goal (KR)",
-                "streamCode": ".filter(...).collect(...)",
-                "forCode": "Java loop equivalent (mandatory)",
-                "quizType": "${randomType}",
-                "targetVar": "${targetVar}",
-                "question": "Instruction including variable name and dot requirement (KR)",
-                "options": ["opt1", "opt2", "opt3", "opt4"],
-                "prefix": "stream()...",
-                "suffix": "(...)...",
-                "answer": "correct string/index (must start with dot for WRITE type)",
-                "explanation": "Brief tip (KR)"
+                "problems": [
+                    {
+                        "dataset": "ORDERS",
+                        "title": "Title (Korean)",
+                        "desc": "Detailed educational story context (Korean)",
+                        "streamCode": ".filter(...)",
+                        "forCode": "Mandatory valid Java for-loop code",
+                        "quizType": "WRITE",
+                        "targetVar": "o",
+                        "question": "Clear instruction including variable requirement (Korean)",
+                        "options": ["opt1", "opt2", "opt3", "opt4"],
+                        "prefix": "stream()...",
+                        "suffix": "(...)...",
+                        "answer": "correct string/index",
+                        "explanation": "Brief tip (Korean)"
+                    },
+                    ...
+                ]
             }`;
 
-        const userPrompt = `Dataset: ${dataset.name}\nSchema: ${dataset.schema}\nType: ${randomType}\nVariable to use: '${targetVar}'. Generate in Korean. Ensure forCode is provided and WRITE answer starts with a dot.`;
+        const userPrompt = `Datasets available: ${Object.keys(DATASETS).join(', ')}. Generate in Korean. Ensure WRITE answer starts with a dot. Be verbose in the 'desc' field.`;
 
         try {
             const response = await fetchWithRetry(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${apiKey}`, {
@@ -507,21 +518,44 @@
             const result = await response.json();
             const aiData = JSON.parse(result.candidates[0].content.parts[0].text);
 
-            practiceMission = {
-                ...aiData,
-                dataset: randomDatasetKey
-            };
+            if (aiData.problems && Array.isArray(aiData.problems)) {
+                problemQueue = [...problemQueue, ...aiData.problems];
+                showToast(`${BATCH_SIZE}개의 새로운 문제가 충전되었습니다!`, "success");
 
-            isSolved = false;
-            updatePracticeUI();
+                // 핵심 수정사항: 생성 직후 큐에서 하나를 즉시 꺼내 UI 업데이트
+                if (!practiceMission || problemQueue.length === BATCH_SIZE) {
+                    practiceMission = problemQueue.shift();
+                    isSolved = false;
+                    updatePracticeUI();
+                }
+            }
         } catch (error) {
             console.error(error);
-            showToast("문제 생성 실패. 다시 시도해 주세요.", "error");
+            showToast("문제 번들 생성 실패. 다시 시도해 주세요.", "error");
         } finally {
-            btn.innerHTML = '<span>다음 문제</span><i data-lucide="arrow-right" class="w-4 h-4"></i>';
+            isFetchingBatch = false;
+            btn.innerHTML = '<span>다음 문제</span><i data-lucide="arrow-right" class="w-4 h-4 group-hover:translate-x-1 transition-transform"></i>';
             btn.disabled = false;
             safeCreateIcons();
         }
+    }
+
+    async function generateNextProblem() {
+        if (problemQueue.length > 0) {
+            practiceMission = problemQueue.shift();
+            isSolved = false;
+            updatePracticeUI();
+            showToast("다음 문제를 불러왔습니다.", "info");
+        } else {
+            // 큐가 비었으면 새로 생성 시작
+            practiceMission = null; // 현재 문제 초기화하여 로딩 표시 유도
+            await fetchProblemsInBatch();
+        }
+    }
+
+    function updateQueueStatus() {
+        const status = document.getElementById('queue-status');
+        if (status) status.textContent = `남은 문제: ${problemQueue.length}`;
     }
 
     async function fetchWithRetry(url, options, retries = 5, delay = 1000) {
@@ -548,7 +582,7 @@
         document.getElementById('quiz-title').textContent = practiceMission.title;
         document.getElementById('quiz-desc').textContent = practiceMission.desc;
         document.getElementById('schema-display').textContent = DATASETS[practiceMission.dataset].schema;
-        document.getElementById('code-for').textContent = practiceMission.forCode || "// 전통적 for문 코드가 생성되지 않았습니다.";
+        document.getElementById('code-for').textContent = practiceMission.forCode || "// 전통적 for문 예시";
         document.getElementById('code-stream').textContent = `list.stream()\n${practiceMission.streamCode};`;
 
         const lambdaBadge = document.getElementById('lambda-hint-badge');
@@ -598,6 +632,7 @@
                     <div class="mt-1 text-[10px] text-slate-500 italic">* 마침표(.)로 연산을 시작하세요. (예: .filter...)</div>
                 `;
         }
+        updateQueueStatus();
         safeCreateIcons();
     }
 
@@ -618,7 +653,6 @@
     function normalizeCode(code) {
         if (!code) return "";
         let normalized = code.trim().replace(/\s+/g, "").toLowerCase();
-
         const lambdaMatch = normalized.match(/^([a-z0-9_$]+)->/);
         if (lambdaMatch) {
             const paramName = lambdaMatch[1];
