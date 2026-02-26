@@ -70,7 +70,7 @@ Gemini Canvas 미션 결과물을 관리하는 저장소입니다.
 
 ### 배포 링크
 
-[https://gemini.google.com/share/90f109572497](https://gemini.google.com/share/90f109572497)
+[https://gemini.google.com/share/135380eac7bf](https://gemini.google.com/share/135380eac7bf)
 
 ### 이 앱을 만든 이유
 
